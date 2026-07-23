@@ -92,10 +92,14 @@ for (const p of PEOPLE) {
 // --- 7. Cohérence Hijri / Grégorien dans "dates" --------------------------
 // Approximation standard : G ≈ H - H/33 + 622. Tolérance de 3 ans (le
 // calendrier hégirien étant lunaire, l'écart varie selon le mois exact).
+// Ce contrôle ne corrige rien tout seul : sans accès aux documents source,
+// une correction automatique risquerait de fabriquer une fausse date.
+// Il fournit juste la liste triée par écart pour vérification manuelle.
 function hijriToGregorianApprox(h) {
   return Math.round(h - h / 33 + 622);
 }
 const DATE_PAIR_RE = /(\d{3,4})\s*هـ\s*\/\s*(\d{3,4})\s*م/g;
+const dateMismatches = [];
 for (const p of PEOPLE) {
   if (!p.dates) continue;
   for (const match of p.dates.matchAll(DATE_PAIR_RE)) {
@@ -103,14 +107,42 @@ for (const p of PEOPLE) {
     const hijri = parseInt(hijriStr, 10);
     const greg = parseInt(gregStr, 10);
     const expected = hijriToGregorianApprox(hijri);
-    if (Math.abs(expected - greg) > 3) {
-      report(
-        "date-mismatch",
-        `${hijriStr}هـ/${gregStr}م incohérent (attendu ~${expected}م ± 3)`,
-        p.id
-      );
+    const diff = expected - greg;
+    if (Math.abs(diff) > 3) {
+      dateMismatches.push({ id: p.id, para: p.family ? `${p.family}§${p.para ?? "?"}` : p.para, hijriStr, gregStr, expected, diff, dates: p.dates, note: p.note || "" });
     }
   }
+}
+dateMismatches.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+for (const r of dateMismatches) {
+  report("date-mismatch", `${r.hijriStr}هـ/${r.gregStr}م incohérent (attendu ~${r.expected}م ± 3, écart ${r.diff > 0 ? "+" : ""}${r.diff} ans)`, r.id);
+}
+
+// --- Rapport détaillé des dates, à part (triable par sévérité) -----------
+if (dateMismatches.length) {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const outDir = new URL("../data-quality/", import.meta.url);
+  fs.mkdirSync(outDir, { recursive: true });
+  const lines = [
+    "# Dates Hijri/Grégorien incohérentes",
+    "",
+    `Générées par \`npm run validate:data\` — ${dateMismatches.length} paires où la conversion approximative`,
+    "(G ≈ H − H/33 + 622) diverge de plus de 3 ans de la date grégorienne enregistrée.",
+    "Aucune correction automatique n'est appliquée : chaque ligne doit être vérifiée contre le document source",
+    "avant modification (via une entrée `setField` dans `src/data/corrections.js`, jamais en éditant `RAW` directement).",
+    "",
+    "Triées par écart décroissant (les plus grosses divergences sont les erreurs de saisie/OCR les plus probables ;",
+    "les petites divergences peuvent n'être qu'une imprécision de la formule d'approximation).",
+    "",
+    "| id | paragraphe | dates enregistrées | grégorien attendu | écart | note |",
+    "|---|---|---|---|---|---|",
+    ...dateMismatches.map(
+      (r) => `| ${r.id} | ${r.para ?? ""} | ${r.dates} | ~${r.expected} | ${r.diff > 0 ? "+" : ""}${r.diff} | ${(r.note || "").replace(/\|/g, "\\|").slice(0, 120)} |`
+    ),
+  ];
+  fs.writeFileSync(new URL("date-mismatches.md", outDir), lines.join("\n") + "\n");
+  if (!asJson) console.error(`(rapport détaillé écrit dans data-quality/date-mismatches.md)`);
 }
 
 // --- Rapport ---------------------------------------------------------------

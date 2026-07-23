@@ -24,20 +24,11 @@
   ========================================================================== */
 export const CORRECTIONS = {
   merges: [
-    // ادمو (مريم) بنت الأمين بن محمذن بن سعدن بن ون (محمذن) بن أحمد زروق : doublon entre
-    // متيلي (M30w1) et أحمد زروق (R70d2, fille de R70, elle-même fils de R67). Signalé par l'utilisateur,
-    // puis corrigé une seconde fois car la première cible (R67d4) était une homonyme différente.
-    ["M30w1", "R70d2", "ادمو (مريم) = امّمو (مريم), fille de R70 (الأمين بن محمذن بن سعدن بن ون بن أحمد زروق), PAS de R67 directement (R67d4 est une homonyme différente, déjà mère d'une autre lignée). Corrigé après signalement de l'utilisateur."],
     // Fatimetou (mère de Mohamed Mbareck/Z61, épouse de Medal/Z58 ET de Mohameden/M47)
     // avait été créée deux fois : une fois correctement comme fille de P26 (Ahmed b.
     // Abou Mohamed, ماهي) via M47, une fois par erreur comme fille de P8 via Z58.
     // On garde M47w2 (déjà reliée à Ahmed fils d'Ebou = P26) et on y fusionne Z58w2.
     ["Z58w2", "M47w2", "Fatimetou : doublon — fille d'Ahmed b. Abou (P26), pas de P8. Signalé par l'utilisateur."],
-    // توت : doublon entre أهل المزضف (Z146w1, mal rattachée à P26) et أهل ماهي (P13d3,
-    // fille d'Ahmed b. Abba = P13). La fusion corrige au passage la mauvaise filiation.
-    ["Z146w1", "P13d3", "Doublon signalé manuellement (توت بنت أحمد بن ابّا... = توت, fille de P13 pas P26)"],
-    // تنم (ميمونو) = تم (ميمونو), fille de محمذن باب (P27), même personne des deux côtés.
-    ["Z147w1", "P27d1", "Doublon signalé manuellement (تنم (ميمونو) = تم (ميمونو))"],
   ],
   setField: [
     // Exemple de format, à dupliquer pour toute future correction ponctuelle :
