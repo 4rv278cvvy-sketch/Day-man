@@ -2,6 +2,8 @@ import React, { useMemo, useState, useCallback } from "react";
 import { APP_VERSION, APP_VERSION_DATE, APP_VERSION_LOG } from "./data/changelog.js";
 import { RAW } from "./data/people.js";
 import { applyCorrections } from "./data/apply-corrections.js";
+import { toFamilyChartData } from "./lib/family-chart-data.js";
+import GenealogyChart from "./components/GenealogyChart.jsx";
 
 const RAW_FILTERED = RAW.filter((p) => p.id !== "P14w_placeholder");
 let PEOPLE = applyCorrections(RAW_FILTERED, { merges: [], setField: [] });
@@ -362,62 +364,6 @@ function findAllPaths(startId, endId, maxDepth = 15, maxPaths = 10) {
   return results;
 }
 
-function PedigreeNode({ id, depth, maxDepth, onSelect, highlightPath }) {
-  const p = byId[id];
-  const isHighlighted = highlightPath && highlightPath.has(id);
-  if (!p) {
-    return <div className="pedigree-node pedigree-empty">؟</div>;
-  }
-  const hasParents = depth < maxDepth && (p.father || p.mother);
-  return (
-    <div className="pedigree-branch">
-      <button
-        className={`pedigree-node ${p.g === "F" ? "pedigree-f" : "pedigree-m"} ${isHighlighted ? "pedigree-hl" : ""}`}
-        onClick={() => onSelect(id)}
-        title={p.name}
-      >
-        <span className="pedigree-node-name">{p.name}{isUnnamed(p.name) && " (X)"}</span>
-        {p.dates && <span className="pedigree-node-dates">{p.dates}</span>}
-      </button>
-      {hasParents && (
-        <div className="pedigree-parents">
-          {p.father ? (
-            <PedigreeNode id={p.father} depth={depth + 1} maxDepth={maxDepth} onSelect={onSelect} highlightPath={highlightPath} />
-          ) : (
-            <div className="pedigree-branch"><div className="pedigree-node pedigree-empty">؟ أب</div></div>
-          )}
-          {p.mother ? (
-            <PedigreeNode id={p.mother} depth={depth + 1} maxDepth={maxDepth} onSelect={onSelect} highlightPath={highlightPath} />
-          ) : (
-            <div className="pedigree-branch"><div className="pedigree-node pedigree-empty">؟ أم</div></div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function AncestorPedigree({ id, onSelect, highlightPath, title }) {
-  const [maxDepth, setMaxDepth] = useState(4);
-  if (!id || !byId[id]) return null;
-  const highlightSet = highlightPath instanceof Set ? highlightPath : highlightPath ? new Set(highlightPath) : null;
-  return (
-    <div className="pedigree-wrap">
-      <div className="pedigree-header">
-        <span>{title || "الشجرة النسبية — Arbre généalogique (père + mère à chaque génération, ancêtres en haut)"}</span>
-        <div className="pedigree-depth-control">
-          <button onClick={() => setMaxDepth((d) => Math.max(1, d - 1))}>−</button>
-          <span>{maxDepth} générations</span>
-          <button onClick={() => setMaxDepth((d) => Math.min(9, d + 1))}>+</button>
-        </div>
-      </div>
-      <div className="pedigree-scroll">
-        <PedigreeNode id={id} depth={0} maxDepth={maxDepth} onSelect={onSelect} highlightPath={highlightSet} />
-      </div>
-    </div>
-  );
-}
-
 function ChainNode({ id, onSelect, highlight }) {
   const p = byId[id];
   if (!p) return <div className="pedigree-node pedigree-empty">؟</div>;
@@ -529,55 +475,6 @@ function PersonPill({ id, onClick, highlight }) {
     <button className={`pill ${highlight ? "pill-hl" : ""}`} onClick={() => onClick(id)}>
       {p.name}
     </button>
-  );
-}
-
-function TreeNode({ id, onSelect, selectedId, depth, filter, expandedOverride, hideExt, debug }) {
-  const p = byId[id];
-  const [open, setOpen] = useState(depth < 2);
-  if (!p) return null;
-  if (hideExt && p.ext) return null;
-  const children = PEOPLE.filter((c) => c.father === id && !(hideExt && c.ext));
-  const matchesFilter = (node) => !filter || node.name.includes(filter);
-  const subtreeMatches = (node) => {
-    if (matchesFilter(node)) return true;
-    return PEOPLE.filter((c) => c.father === node.id).some((c) => subtreeMatches(c));
-  };
-  if (filter && !subtreeMatches(p)) return null;
-  const isOpen = filter ? true : open;
-  const fam = familyOf(id);
-
-  return (
-    <div className="tree-node" style={{ "--depth": depth }}>
-      <div className={`tree-row ${selectedId === id ? "tree-row-sel" : ""}`}>
-        {children.length > 0 ? (
-          <button className="twisty" onClick={() => setOpen((o) => !o)} aria-label={isOpen ? "Réduire" : "Développer"}>
-            {isOpen ? "−" : "+"}
-          </button>
-        ) : (
-          <span className="twisty twisty-empty" />
-        )}
-        <button className={`tree-label ${p.g === "F" ? "is-fem" : ""}`} onClick={() => onSelect(id)}>
-          <span className="tree-gen" title="الجيل — génération depuis سيد الفالي">ج{generationNumber(id)}</span>
-          <span className="tree-name">{p.name}</span>
-          {isUnnamed(p.name) && <span className="badge-unknown" title="اسمها غير مسجّل في المصدر الأصلي — Identité non enregistrée dans le document source">X</span>}
-          {p.ext && <span className="badge-ext badge-ext-sm" title="قبيلة خارجية — Lignée extérieure à la tribu">خارجية</span>}
-          {debug && <span className="dbg-id">{p.id}</span>}
-          {fam && fam.key !== "tribe" && <span className={`tree-fam tree-fam-${fam.key}`}>{familyShortLabel(fam.key)}</span>}
-          {p.para && <span className="tree-para">ف.{p.para}</span>}
-          {p.dates && <span className="tree-dates">{p.dates}</span>}
-        </button>
-      </div>
-      {isOpen && children.length > 0 && (
-        <div className="tree-children">
-          {children
-            .sort((a, b) => (a.para || 999) - (b.para || 999))
-            .map((c) => (
-              <TreeNode key={c.id} id={c.id} onSelect={onSelect} selectedId={selectedId} depth={depth + 1} filter={filter} hideExt={hideExt} debug={debug} />
-            ))}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -1239,13 +1136,14 @@ const CORRECTIONS_STORAGE_KEY = "sidi-elvali-user-corrections";
 
 export default function App() {
   const [selectedId, setSelectedId] = useState("P1");
-  const [filter, setFilter] = useState("");
   const [hideExt, setHideExt] = useState(true);
   const [debug, setDebug] = useState(false);
   const [tab, setTab] = useState("tree"); // 'tree' | 'finder' | 'corrections'
   const [userCorrections, setUserCorrections] = useState({ merges: [], setField: [] });
   const [datasetVersion, setDatasetVersion] = useState(0);
   const [correctionsLoaded, setCorrectionsLoaded] = useState(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const familyChartData = useMemo(() => toFamilyChartData(PEOPLE, { hideExt }), [datasetVersion, hideExt]);
 
   React.useEffect(() => {
     (async () => {
@@ -1298,9 +1196,6 @@ export default function App() {
     [userCorrections, persistCorrections]
   );
 
-  const roots = ["T0-hamnadh", "N1", "H1", "W1", "V1", "G1"];
-  // Z1 (المزضف) est déjà rattaché à T0 comme descendant de sang — pas besoin de racine séparée.
-
   return (
     <div className="app">
       <style>{CSS}</style>
@@ -1341,12 +1236,6 @@ export default function App() {
             <div className="sidebar-smart-search">
               <PersonPicker label="" value={null} onChange={setSelectedId} placeholder="بحث ذكي بالاسم أو السلسلة — أحمد محمد علي…" />
             </div>
-            <input
-              className="filter-input"
-              placeholder="تصفية الشجرة المعروضة — Filtrer l'arbre affiché…"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-            />
             <label className="ext-toggle">
               <input type="checkbox" checked={hideExt} onChange={(e) => setHideExt(e.target.checked)} />
               <span>إخفاء القبائل الخارجية — Masquer les lignées extérieures</span>
@@ -1356,11 +1245,6 @@ export default function App() {
               <input type="checkbox" checked={debug} onChange={(e) => setDebug(e.target.checked)} />
               <span>وضع التصحيح: إظهار المعرّفات — Mode debug : identifiants techniques</span>
             </label>
-            <div className="sidebar-scroll">
-              {roots.map((r) => (
-                <TreeNode key={r} id={r} onSelect={setSelectedId} selectedId={selectedId} depth={0} filter={filter} hideExt={hideExt} debug={debug} />
-              ))}
-            </div>
             <div className="sidebar-legend sidebar-legend-wrap">
               <span className="tree-fam tree-fam-mahi">ماهي</span>
               <span className="tree-fam tree-fam-karim">الكريم</span>
@@ -1384,9 +1268,9 @@ export default function App() {
               <span className="legend-note"><span className="badge-unknown badge-unknown-sm" /> = identité non enregistrée dans le document source (désignation générique « فلانة »/« فالن »)</span>
             </div>
           </aside>
-          <section className="content">
+          <section className="content content-with-chart">
+            <GenealogyChart data={familyChartData} mainId={selectedId} onSelect={setSelectedId} />
             <PersonDetail id={selectedId} onSelect={setSelectedId} onMerge={addMerge} onSetField={addSetField} debug={debug} />
-            <AncestorPedigree id={selectedId} onSelect={setSelectedId} />
           </section>
         </main>
       )}
@@ -1688,6 +1572,29 @@ const CSS = `
 .tree-para { font-size: 10px; color: var(--gold); border: 1px solid var(--gold); border-radius: 4px; padding: 0 4px; }
 .tree-dates { font-size: 10px; color: #8a7d5e; }
 .tree-children { border-right: 1px dashed var(--line); margin-right: 8px; }
+
+/* Arbre interactif (family-chart) */
+.content-with-chart { display: flex; flex-direction: column; gap: 20px; }
+.genealogy-chart-wrap { display: flex; flex-direction: column; gap: 10px; }
+.genealogy-chart-controls { display: flex; gap: 20px; flex-wrap: wrap; direction: rtl; }
+.genealogy-chart-cont {
+  width: 100%;
+  height: 62vh;
+  min-height: 420px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  --female-color: #A9781F;
+  --male-color: #23395E;
+  --genderless-color: #C9B78C;
+  --background-color: #FBF6E9;
+  --text-color: #241D12;
+  font-family: 'Cairo', sans-serif;
+  direction: ltr; /* la mise en page de l'arbre (position des cartes) reste LTR ; le texte arabe s'affiche correctement dans chaque carte */
+}
+.genealogy-chart-cont .card-html .card-inner { direction: rtl; font-family: 'Cairo', sans-serif; }
+.genealogy-chart-cont .card-html .card-main-outline { stroke: var(--gold); }
 
 /* Detail */
 .content { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 26px; direction: rtl; }
