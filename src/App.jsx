@@ -1585,16 +1585,27 @@ const CSS = `
   border-radius: 10px;
   overflow: hidden;
   position: relative;
-  --female-color: #A9781F;
-  --male-color: #23395E;
-  --genderless-color: #C9B78C;
+  /* Fonds clairs + texte sombre pour les deux genres : plus de contraste
+     à garantir par genre, lisible dans tous les cas (l'ancien bleu marine
+     avec texte sombre était illisible). */
+  --female-color: #E4D3AC;
+  --male-color: #AEC2D6;
+  --genderless-color: #D8D0BA;
   --background-color: #FBF6E9;
   --text-color: #241D12;
   font-family: 'Cairo', sans-serif;
   direction: ltr; /* la mise en page de l'arbre (position des cartes) reste LTR ; le texte arabe s'affiche correctement dans chaque carte */
 }
 .genealogy-chart-cont .card-html .card-inner { direction: rtl; font-family: 'Cairo', sans-serif; }
-.genealogy-chart-cont .card-html .card-main-outline { stroke: var(--gold); }
+.genealogy-chart-cont .card-html .card-main-outline { stroke: var(--indigo); stroke-width: 3px; }
+/* Les liens parent<->enfant étaient tracés en blanc sur fond clair (invisibles) ;
+   ligne pointillée bien visible pour bien suivre qui est relié à qui. */
+.genealogy-chart-cont .link {
+  stroke: #8C6D3F;
+  stroke-width: 2px;
+  stroke-dasharray: 1 5;
+  stroke-linecap: round;
+}
 
 /* Detail */
 .content { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 26px; direction: rtl; }
