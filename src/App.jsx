@@ -1577,6 +1577,19 @@ const CSS = `
 .content-with-chart { display: flex; flex-direction: column; gap: 20px; }
 .genealogy-chart-wrap { display: flex; flex-direction: column; gap: 10px; }
 .genealogy-chart-controls { display: flex; gap: 20px; flex-wrap: wrap; direction: rtl; }
+.genealogy-export-control button {
+  width: auto; height: auto; border-radius: 6px; padding: 4px 10px;
+  font-family: 'Cairo'; font-weight: 700;
+}
+.genealogy-export-control button:disabled { opacity: 0.5; cursor: wait; }
+.genealogy-export-spinner { color: var(--gold); }
+.genealogy-export-overlay {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(36, 29, 18, 0.55);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--sand); font-family: 'Cairo'; font-size: 16px; font-weight: 700;
+  direction: rtl;
+}
 .genealogy-chart-cont {
   width: 100%;
   height: 62vh;
