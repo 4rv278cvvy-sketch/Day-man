@@ -1613,6 +1613,29 @@ const CSS = `
   color: var(--sand); font-family: 'Cairo'; font-size: 16px; font-weight: 700;
   direction: rtl;
 }
+.genealogy-result-overlay {
+  position: fixed; inset: 0; z-index: 550;
+  background: #111;
+  display: flex; flex-direction: column;
+}
+.genealogy-result-bar {
+  flex: none; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 10px 16px; background: #222; color: #fff;
+  font-family: 'Cairo'; font-size: 13px; direction: rtl;
+}
+.genealogy-result-bar a { color: #9cf; font-weight: 700; }
+.genealogy-result-bar button {
+  margin-inline-start: auto; background: none; border: 1px solid #555; color: #fff;
+  border-radius: 6px; padding: 4px 10px; font-family: 'Cairo'; cursor: pointer;
+}
+.genealogy-result-body {
+  flex: 1; overflow: auto; -webkit-overflow-scrolling: touch;
+}
+/* Ajustée à la largeur de l'écran d'abord (vue d'ensemble lisible) ; le
+   pincement natif du navigateur (non désactivé par le viewport meta de la
+   page) permet ensuite de zoomer sur un détail précis. */
+.genealogy-result-body img { display: block; width: 100%; height: auto; }
+.genealogy-result-body iframe { border: none; width: 100%; height: 100%; }
 .genealogy-chart-cont {
   width: 100%;
   height: 62vh;

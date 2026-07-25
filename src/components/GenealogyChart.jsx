@@ -23,26 +23,6 @@ function paintLinks(cont) {
   });
 }
 
-// Solution de secours (navigateurs sans Web Share API — essentiellement le
-// bureau) : affiche le résultat dans un onglet déjà ouvert, avec un vrai lien
-// <a download> à taper/cliquer soi-même, plus un aperçu intégré.
-function writeResultTab(tab, blob, filename, format) {
-  const blobUrl = tab.URL.createObjectURL(blob);
-  const downloadBar = `<div style="padding:10px;background:#222;color:#fff;font-family:sans-serif;text-align:center;direction:rtl;flex:none">
-    <a download="${filename}" href="${blobUrl}" style="color:#9cf;font-weight:bold">اضغط هنا للتنزيل — Tap here to download</a>
-    — ${format === "png" ? "أو اضغط مطولاً على الصورة" : "أو استخدم أيقونة المشاركة أسفل المعاينة"}
-  </div>`;
-  const preview =
-    format === "png"
-      ? `<img src="${blobUrl}" style="max-width:100%;height:auto" />`
-      : `<iframe src="${blobUrl}" style="flex:1;border:none;width:100%"></iframe>`;
-  tab.document.open();
-  tab.document.write(
-    `<title>شجرة نسب قبيلة سيد الفالي</title><body style="margin:0;background:#111;display:flex;flex-direction:column;height:100vh">${downloadBar}${preview}</body>`
-  );
-  tab.document.close();
-}
-
 export default function GenealogyChart({ data, mainId, onSelect }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
@@ -50,6 +30,11 @@ export default function GenealogyChart({ data, mainId, onSelect }) {
   const [ancestryDepth, setAncestryDepth] = useState(2);
   const [progenyDepth, setProgenyDepth] = useState(1);
   const [exporting, setExporting] = useState(false);
+  // { url, filename, format } | null — résultat affiché en plein écran DANS
+  // cette même page (pas un nouvel onglet, pas de feuille de partage) : ça
+  // s'est avéré être la seule approche fiable sur mobile après plusieurs
+  // échecs (voir exportTree ci-dessous pour l'historique des essais ratés).
+  const [exportResult, setExportResult] = useState(null);
 
   useEffect(() => {
     onSelectRef.current = onSelect;
@@ -107,6 +92,18 @@ export default function GenealogyChart({ data, mainId, onSelect }) {
     }
   }, [mainId]);
 
+  // Empêche la page de fond de défiler pendant que le résultat plein écran
+  // est ouvert (sinon le "position: fixed" reste correct mais l'utilisateur
+  // peut faire défiler la page derrière, ce qui prête à confusion).
+  useEffect(() => {
+    if (!exportResult) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [exportResult]);
+
   // "fit" (plutôt que "main_to_middle") après un changement de profondeur : une
   // famille nombreuse sur plusieurs générations peut s'étaler sur des milliers
   // de pixels, et centrer à l'échelle 1 pousserait alors les cartes hors du
@@ -134,61 +131,33 @@ export default function GenealogyChart({ data, mainId, onSelect }) {
   // capture du petit cadre visible à l'écran : on agrandit temporairement le
   // conteneur à la taille réelle de l'arbre, on le réajuste avec "fit" pour
   // qu'il occupe tout cet espace à l'échelle naturelle, on capture, puis on
-  // restaure l'affichage normal. (Le redimensionnement hors-écran via
-  // position:fixed + décalage négatif énorme casse la capture — testé —
-  // donc on redimensionne en place, caché derrière l'overlay "exporting".)
+  // restaure l'affichage normal.
   //
-  // On n'utilise PAS <a download>.click() : un clic synthétique sur un lien
-  // download est ignoré sans erreur par Safari iOS et par beaucoup de
-  // navigateurs intégrés à une app (dont celui de l'app Claude) — seul un VRAI
-  // tap de l'utilisateur sur un lien déclenche l'enregistrement là-bas. On
-  // ouvre donc un onglet vide de façon SYNCHRONE dès le clic (avant tout
-  // await, sinon le navigateur bloque l'ouverture comme un pop-up), puis on y
-  // affiche le résultat avec un vrai lien à taper soi-même, plus un aperçu
-  // (image ou PDF intégré) pour un appui long / le partage natif du lecteur
-  // PDF comme alternative.
-  //
-  // Autre piège rencontré : une blob: URL n'est utilisable QUE dans la
-  // fenêtre où elle a été enregistrée (outputTab.URL.createObjectURL, pas
-  // URL.createObjectURL de cette page-ci) — et même ainsi, Chrome refuse
-  // qu'un script d'une AUTRE fenêtre navigue l'onglet vers cette blob: URL
-  // (outputTab.location.href = ... échoue silencieusement). Il faut
-  // uniquement s'en servir comme src/href de balises écrites dans l'onglet.
-  //
-  // ET MÊME AINSI : sur Chrome pour iOS (testé), taper sur ce lien <a
-  // download> ne fait toujours rien. Chrome/Firefox/Edge sur iOS sont tous
-  // des coquilles autour de WebKit (imposé par Apple) mais SANS l'intégration
-  // "téléchargement" que Safari lui-même construit par-dessus — l'attribut
-  // download n'y est donc pas fiable, quel que soit le navigateur. La feuille
-  // de partage native (Web Share API) est fournie par WebKit/iOS lui-même,
-  // pas par l'app-navigateur : elle marche donc de façon homogène partout.
-  // On l'utilise en priorité quand le navigateur peut partager des fichiers,
-  // et on ne garde l'onglet/lien de secours que pour les navigateurs qui ne
-  // savent pas du tout partager de fichiers (essentiellement le bureau).
+  // Historique des approches essayées pour livrer le résultat, et pourquoi
+  // chacune a été abandonnée (utile si ce code est retouché un jour) :
+  //  1. <a download>.click() synthétique → ignoré sans erreur par Safari iOS
+  //     et les navigateurs intégrés à une app.
+  //  2. Onglet ouvert avec window.open + vrai lien <a download> à taper →
+  //     un blob: URL n'est utilisable que dans la fenêtre qui l'a créé, et
+  //     même corrigé, Chrome pour iOS ignore quand même l'attribut download
+  //     (aucun navigateur iOS autre que Safari lui-même ne construit cette
+  //     intégration par-dessus WebKit).
+  //  3. navigator.share() (feuille de partage native, fournie par WebKit/iOS
+  //     et donc homogène entre navigateurs) → marche en théorie, mais échoue
+  //     silencieusement quand la page tourne dans un iframe/cadre sandboxé
+  //     (le cas de l'aperçu d'artefact) sans qu'on puisse le détecter à coup sûr.
+  // Solution retenue : rien de tout ça. On affiche l'image en plein écran
+  // DANS cette même page (donc aucune histoire de fenêtre/onglet/permission),
+  // zoomable au pincement, avec comme mécanisme d'enregistrement le geste le
+  // plus basique qui soit : l'appui long natif du navigateur sur une image
+  // pour l'enregistrer — une fonctionnalité du système, pas du JavaScript,
+  // qui marche partout sur iOS quel que soit le navigateur.
   async function exportTree(format) {
     const chart = chartRef.current;
     const cont = containerRef.current;
     if (!chart || !cont || exporting) return;
 
-    const filename = format === "png" ? "شجرة-نسب-سيد-الفالي.png" : "شجرة-نسب-سيد-الفالي.pdf";
-    const mime = format === "png" ? "image/png" : "application/pdf";
-    const canUseShareSheet =
-      typeof navigator.share === "function" &&
-      typeof navigator.canShare === "function" &&
-      navigator.canShare({ files: [new File([""], filename, { type: mime })] });
-
-    // On n'ouvre l'onglet de secours QUE si on n'utilisera pas la feuille de
-    // partage — et on l'ouvre tout de suite, de façon synchrone dans le clic,
-    // sinon le navigateur le bloquerait comme un pop-up une fois passé par
-    // l'attente asynchrone de la capture.
-    const outputTab = canUseShareSheet ? null : window.open("", "_blank");
-    if (outputTab) {
-      outputTab.document.write(
-        '<title>شجرة نسب قبيلة سيد الفالي</title><body style="margin:0;background:#111;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;padding:20px;box-sizing:border-box">جاري تحضير الملف… — Préparation du fichier…</body>'
-      );
-    }
     setExporting(true);
-    await new Promise((r) => requestAnimationFrame(r)); // laisse l'overlay s'afficher avant le redimensionnement
     const prevStyle = { width: cont.style.width, height: cont.style.height };
     try {
       const tree = chart.store.getTree();
@@ -202,9 +171,11 @@ export default function GenealogyChart({ data, mainId, onSelect }) {
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
       let blob;
+      let filename;
       if (format === "png") {
         // PNG : sans perte, pour un usage d'archive/retouche.
         blob = await toBlob(cont, { width, height, backgroundColor: "#FBF6E9", pixelRatio: 2 });
+        filename = "شجرة-نسب-سيد-الفالي.png";
       } else {
         // JPEG (pas PNG) dans le PDF : un PNG plein cadre à pixelRatio 2 produit
         // un PDF de 20-25 Mo pour un simple diagramme à aplats de couleur — le
@@ -213,43 +184,23 @@ export default function GenealogyChart({ data, mainId, onSelect }) {
         const pdf = new jsPDF({ orientation: width >= height ? "landscape" : "portrait", unit: "px", format: [width, height] });
         pdf.addImage(dataUrl, "JPEG", 0, 0, width, height);
         blob = pdf.output("blob");
+        filename = "شجرة-نسب-سيد-الفالي.pdf";
       }
 
-      if (canUseShareSheet) {
-        try {
-          await navigator.share({ files: [new File([blob], filename, { type: mime })], title: "شجرة نسب قبيلة سيد الفالي" });
-        } catch (shareErr) {
-          // AbortError = l'utilisateur a fermé la feuille de partage lui-même : rien à faire.
-          // Toute autre erreur : on bascule sur l'onglet de secours, ouvert maintenant
-          // (plus dans la fenêtre synchrone du clic, mais c'est le seul moment où on
-          // sait qu'on en a besoin).
-          if (!shareErr || shareErr.name !== "AbortError") {
-            const fallbackTab = window.open("", "_blank");
-            if (fallbackTab) writeResultTab(fallbackTab, blob, filename, format);
-            else window.location.href = URL.createObjectURL(blob);
-          }
-        }
-      } else if (outputTab && !outputTab.closed) {
-        writeResultTab(outputTab, blob, filename, format);
-      } else {
-        // Le navigateur a bloqué l'ouverture d'onglet (rare vu qu'on l'ouvre en
-        // synchrone) : on retombe sur un lien de téléchargement dans la page
-        // actuelle, à taper soi-même.
-        const blobUrl = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = blobUrl;
-        link.download = filename;
-        link.textContent = "تنزيل الملف — Télécharger le fichier";
-        link.style.cssText = "position:fixed;inset:0;z-index:600;display:flex;align-items:center;justify-content:center;background:#111;color:#9cf;font-size:20px";
-        link.onclick = () => setTimeout(() => link.remove(), 300);
-        document.body.appendChild(link);
-      }
+      // Même document, même fenêtre : pas de restriction blob: cross-fenêtre ici.
+      const url = URL.createObjectURL(blob);
+      setExportResult({ url, filename, format });
     } finally {
       cont.style.width = prevStyle.width;
       cont.style.height = prevStyle.height;
       chart.updateTree({ tree_position: "main_to_middle", transition_time: 0 });
       setExporting(false);
     }
+  }
+
+  function closeExportResult() {
+    if (exportResult) URL.revokeObjectURL(exportResult.url);
+    setExportResult(null);
   }
 
   return (
@@ -278,6 +229,26 @@ export default function GenealogyChart({ data, mainId, onSelect }) {
       {exporting && (
         <div className="genealogy-export-overlay">
           <span>جاري تحضير الصورة… — Génération de l'export…</span>
+        </div>
+      )}
+      {exportResult && (
+        <div className="genealogy-result-overlay">
+          <div className="genealogy-result-bar">
+            <span>
+              {exportResult.format === "png"
+                ? "اضغط مطولاً على الصورة لحفظها — Long-press the image to save it"
+                : "استخدم أيقونة المشاركة في أسفل الشاشة — Use the share icon at the bottom of the viewer"}
+            </span>
+            <a href={exportResult.url} download={exportResult.filename}>تنزيل — Download</a>
+            <button onClick={closeExportResult}>✕ إغلاق</button>
+          </div>
+          <div className="genealogy-result-body">
+            {exportResult.format === "png" ? (
+              <img src={exportResult.url} alt="شجرة النسب" />
+            ) : (
+              <iframe src={exportResult.url} title="شجرة النسب PDF" />
+            )}
+          </div>
         </div>
       )}
     </div>
