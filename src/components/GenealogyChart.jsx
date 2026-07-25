@@ -23,6 +23,26 @@ function paintLinks(cont) {
   });
 }
 
+// Solution de secours (navigateurs sans Web Share API — essentiellement le
+// bureau) : affiche le résultat dans un onglet déjà ouvert, avec un vrai lien
+// <a download> à taper/cliquer soi-même, plus un aperçu intégré.
+function writeResultTab(tab, blob, filename, format) {
+  const blobUrl = tab.URL.createObjectURL(blob);
+  const downloadBar = `<div style="padding:10px;background:#222;color:#fff;font-family:sans-serif;text-align:center;direction:rtl;flex:none">
+    <a download="${filename}" href="${blobUrl}" style="color:#9cf;font-weight:bold">اضغط هنا للتنزيل — Tap here to download</a>
+    — ${format === "png" ? "أو اضغط مطولاً على الصورة" : "أو استخدم أيقونة المشاركة أسفل المعاينة"}
+  </div>`;
+  const preview =
+    format === "png"
+      ? `<img src="${blobUrl}" style="max-width:100%;height:auto" />`
+      : `<iframe src="${blobUrl}" style="flex:1;border:none;width:100%"></iframe>`;
+  tab.document.open();
+  tab.document.write(
+    `<title>شجرة نسب قبيلة سيد الفالي</title><body style="margin:0;background:#111;display:flex;flex-direction:column;height:100vh">${downloadBar}${preview}</body>`
+  );
+  tab.document.close();
+}
+
 export default function GenealogyChart({ data, mainId, onSelect }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
@@ -134,11 +154,34 @@ export default function GenealogyChart({ data, mainId, onSelect }) {
   // qu'un script d'une AUTRE fenêtre navigue l'onglet vers cette blob: URL
   // (outputTab.location.href = ... échoue silencieusement). Il faut
   // uniquement s'en servir comme src/href de balises écrites dans l'onglet.
+  //
+  // ET MÊME AINSI : sur Chrome pour iOS (testé), taper sur ce lien <a
+  // download> ne fait toujours rien. Chrome/Firefox/Edge sur iOS sont tous
+  // des coquilles autour de WebKit (imposé par Apple) mais SANS l'intégration
+  // "téléchargement" que Safari lui-même construit par-dessus — l'attribut
+  // download n'y est donc pas fiable, quel que soit le navigateur. La feuille
+  // de partage native (Web Share API) est fournie par WebKit/iOS lui-même,
+  // pas par l'app-navigateur : elle marche donc de façon homogène partout.
+  // On l'utilise en priorité quand le navigateur peut partager des fichiers,
+  // et on ne garde l'onglet/lien de secours que pour les navigateurs qui ne
+  // savent pas du tout partager de fichiers (essentiellement le bureau).
   async function exportTree(format) {
     const chart = chartRef.current;
     const cont = containerRef.current;
     if (!chart || !cont || exporting) return;
-    const outputTab = window.open("", "_blank");
+
+    const filename = format === "png" ? "شجرة-نسب-سيد-الفالي.png" : "شجرة-نسب-سيد-الفالي.pdf";
+    const mime = format === "png" ? "image/png" : "application/pdf";
+    const canUseShareSheet =
+      typeof navigator.share === "function" &&
+      typeof navigator.canShare === "function" &&
+      navigator.canShare({ files: [new File([""], filename, { type: mime })] });
+
+    // On n'ouvre l'onglet de secours QUE si on n'utilisera pas la feuille de
+    // partage — et on l'ouvre tout de suite, de façon synchrone dans le clic,
+    // sinon le navigateur le bloquerait comme un pop-up une fois passé par
+    // l'attente asynchrone de la capture.
+    const outputTab = canUseShareSheet ? null : window.open("", "_blank");
     if (outputTab) {
       outputTab.document.write(
         '<title>شجرة نسب قبيلة سيد الفالي</title><body style="margin:0;background:#111;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;padding:20px;box-sizing:border-box">جاري تحضير الملف… — Préparation du fichier…</body>'
@@ -159,11 +202,9 @@ export default function GenealogyChart({ data, mainId, onSelect }) {
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
       let blob;
-      let filename;
       if (format === "png") {
         // PNG : sans perte, pour un usage d'archive/retouche.
         blob = await toBlob(cont, { width, height, backgroundColor: "#FBF6E9", pixelRatio: 2 });
-        filename = "شجرة-نسب-سيد-الفالي.png";
       } else {
         // JPEG (pas PNG) dans le PDF : un PNG plein cadre à pixelRatio 2 produit
         // un PDF de 20-25 Mo pour un simple diagramme à aplats de couleur — le
@@ -172,24 +213,24 @@ export default function GenealogyChart({ data, mainId, onSelect }) {
         const pdf = new jsPDF({ orientation: width >= height ? "landscape" : "portrait", unit: "px", format: [width, height] });
         pdf.addImage(dataUrl, "JPEG", 0, 0, width, height);
         blob = pdf.output("blob");
-        filename = "شجرة-نسب-سيد-الفالي.pdf";
       }
 
-      if (outputTab && !outputTab.closed) {
-        const blobUrl = outputTab.URL.createObjectURL(blob);
-        const downloadBar = `<div style="padding:10px;background:#222;color:#fff;font-family:sans-serif;text-align:center;direction:rtl;flex:none">
-          <a download="${filename}" href="${blobUrl}" style="color:#9cf;font-weight:bold">اضغط هنا للتنزيل — Tap here to download</a>
-          — ${format === "png" ? "أو اضغط مطولاً على الصورة" : "أو استخدم أيقونة المشاركة أسفل المعاينة"}
-        </div>`;
-        const preview =
-          format === "png"
-            ? `<img src="${blobUrl}" style="max-width:100%;height:auto" />`
-            : `<iframe src="${blobUrl}" style="flex:1;border:none;width:100%"></iframe>`;
-        outputTab.document.open();
-        outputTab.document.write(
-          `<title>شجرة نسب قبيلة سيد الفالي</title><body style="margin:0;background:#111;display:flex;flex-direction:column;height:100vh">${downloadBar}${preview}</body>`
-        );
-        outputTab.document.close();
+      if (canUseShareSheet) {
+        try {
+          await navigator.share({ files: [new File([blob], filename, { type: mime })], title: "شجرة نسب قبيلة سيد الفالي" });
+        } catch (shareErr) {
+          // AbortError = l'utilisateur a fermé la feuille de partage lui-même : rien à faire.
+          // Toute autre erreur : on bascule sur l'onglet de secours, ouvert maintenant
+          // (plus dans la fenêtre synchrone du clic, mais c'est le seul moment où on
+          // sait qu'on en a besoin).
+          if (!shareErr || shareErr.name !== "AbortError") {
+            const fallbackTab = window.open("", "_blank");
+            if (fallbackTab) writeResultTab(fallbackTab, blob, filename, format);
+            else window.location.href = URL.createObjectURL(blob);
+          }
+        }
+      } else if (outputTab && !outputTab.closed) {
+        writeResultTab(outputTab, blob, filename, format);
       } else {
         // Le navigateur a bloqué l'ouverture d'onglet (rare vu qu'on l'ouvre en
         // synchrone) : on retombe sur un lien de téléchargement dans la page
