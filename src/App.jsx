@@ -1196,9 +1196,18 @@ export default function App() {
     [userCorrections, persistCorrections]
   );
 
+  const isFramed = typeof window !== "undefined" && window.self !== window.top;
+
   return (
     <div className="app">
       <style>{CSS}</style>
+      {isFramed && (
+        <a className="frame-escape-banner" href={window.location.href} target="_blank" rel="noopener">
+          هذه معاينة داخل إطار مضمّن، وقد تمنع بعض المتصفحات التنزيل/المشاركة هنا — اضغط لفتح التطبيق في نافذة كاملة
+          <br />
+          This preview is running inside an embedded frame, which some browsers block downloads/sharing in — tap to open the app in a full tab
+        </a>
+      )}
       <header className="app-header">
         <div className="app-header-inner">
           <div className="app-title-block">
@@ -1342,6 +1351,20 @@ const CSS = `
   display: flex;
   flex-direction: column;
 }
+
+.frame-escape-banner {
+  display: block;
+  background: var(--brick);
+  color: #fff;
+  text-align: center;
+  padding: 10px 16px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px;
+  line-height: 1.6;
+  text-decoration: underline;
+  direction: rtl;
+}
+.frame-escape-banner:hover { background: #a4483a; }
 
 .app-header {
   background: var(--indigo-deep);
