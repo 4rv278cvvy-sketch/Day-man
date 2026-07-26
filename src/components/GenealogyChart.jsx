@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as f3 from "family-chart";
 import "family-chart/styles/family-chart.css";
-import { toBlob, toJpeg } from "html-to-image";
+import { toPng, toJpeg } from "html-to-image";
 import { jsPDF } from "jspdf";
 
 // Arbre interactif (ascendants + conjoint(e)s + descendants autour d'une
@@ -146,12 +146,15 @@ export default function GenealogyChart({ data, mainId, onSelect }) {
   //     et donc homogène entre navigateurs) → marche en théorie, mais échoue
   //     silencieusement quand la page tourne dans un iframe/cadre sandboxé
   //     (le cas de l'aperçu d'artefact) sans qu'on puisse le détecter à coup sûr.
-  // Solution retenue : rien de tout ça. On affiche l'image en plein écran
-  // DANS cette même page (donc aucune histoire de fenêtre/onglet/permission),
-  // zoomable au pincement, avec comme mécanisme d'enregistrement le geste le
-  // plus basique qui soit : l'appui long natif du navigateur sur une image
-  // pour l'enregistrer — une fonctionnalité du système, pas du JavaScript,
-  // qui marche partout sur iOS quel que soit le navigateur.
+  //  4. Image affichée en plein écran DANS la page avec un blob: URL comme
+  //     src, appui long natif pour l'enregistrer → l'appui long déclenche
+  //     bien le menu natif iOS cette fois, mais « Enregistrer l'image »
+  //     échoue avec « Cannot save image — No Internet connection » (testé) :
+  //     le mécanisme d'enregistrement d'iOS semble vouloir re-télécharger la
+  //     ressource plutôt que lire les octets déjà en mémoire pour une blob: URL.
+  // Solution retenue : la même chose que 4, mais avec une data: URI comme src
+  // au lieu d'une blob: URL — l'image est encodée directement dans la chaîne
+  // de l'URL, donc il n'y a rien à re-télécharger pour l'enregistrer.
   async function exportTree(format) {
     const chart = chartRef.current;
     const cont = containerRef.current;
@@ -170,11 +173,16 @@ export default function GenealogyChart({ data, mainId, onSelect }) {
       chart.updateTree({ tree_position: "fit", transition_time: 0 });
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-      let blob;
+      let url;
       let filename;
       if (format === "png") {
-        // PNG : sans perte, pour un usage d'archive/retouche.
-        blob = await toBlob(cont, { width, height, backgroundColor: "#FBF6E9", pixelRatio: 2 });
+        // data: URI (pas blob:) : le geste natif iOS « appui long → Enregistrer
+        // l'image » a échoué avec « Cannot save image — No Internet connection »
+        // sur une blob: URL — testé sur le téléphone de l'utilisateur. iOS semble
+        // vouloir re-télécharger la ressource plutôt que lire les octets déjà en
+        // mémoire pour une blob: URL. Une data: URI contient l'image telle
+        // quelle dans la chaîne elle-même, donc rien à aller chercher.
+        url = await toPng(cont, { width, height, backgroundColor: "#FBF6E9", pixelRatio: 2 });
         filename = "شجرة-نسب-سيد-الفالي.png";
       } else {
         // JPEG (pas PNG) dans le PDF : un PNG plein cadre à pixelRatio 2 produit
@@ -183,12 +191,13 @@ export default function GenealogyChart({ data, mainId, onSelect }) {
         const dataUrl = await toJpeg(cont, { width, height, backgroundColor: "#FBF6E9", pixelRatio: 2, quality: 0.92 });
         const pdf = new jsPDF({ orientation: width >= height ? "landscape" : "portrait", unit: "px", format: [width, height] });
         pdf.addImage(dataUrl, "JPEG", 0, 0, width, height);
-        blob = pdf.output("blob");
+        // Le PDF est affiché dans un <iframe> (pas via le geste "enregistrer
+        // l'image" d'iOS), donc pas concerné par le même problème ; datauristring
+        // reste plus simple qu'un blob: à révoquer.
+        url = pdf.output("datauristring");
         filename = "شجرة-نسب-سيد-الفالي.pdf";
       }
 
-      // Même document, même fenêtre : pas de restriction blob: cross-fenêtre ici.
-      const url = URL.createObjectURL(blob);
       setExportResult({ url, filename, format });
     } finally {
       cont.style.width = prevStyle.width;
@@ -199,7 +208,6 @@ export default function GenealogyChart({ data, mainId, onSelect }) {
   }
 
   function closeExportResult() {
-    if (exportResult) URL.revokeObjectURL(exportResult.url);
     setExportResult(null);
   }
 
