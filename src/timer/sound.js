@@ -63,6 +63,31 @@ export function speakCountNumber(n) {
   speak(String(n), { pitch: 1.3, rate: 1.1 });
 }
 
-export function speakFinal(character) {
-  speak(character.finalWord, { pitch: 1.1, rate: 0.95 });
+// Plays the fanfare + spoken buddy sound once, then calls onDone — used
+// both for a single "hear it again" tap and to chain indefinite repeats.
+export function playFinalOnce(character, onDone) {
+  playFinalFanfare(character);
+
+  if (!("speechSynthesis" in window)) {
+    if (onDone) setTimeout(onDone, 900);
+    return;
+  }
+
+  ensureVoices();
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(character.finalWord);
+  utterance.pitch = 1.1;
+  utterance.rate = 0.95;
+
+  let done = false;
+  const finishOnce = () => {
+    if (done) return;
+    done = true;
+    if (onDone) onDone();
+  };
+  utterance.onend = finishOnce;
+  utterance.onerror = finishOnce;
+  window.speechSynthesis.speak(utterance);
+  // Fallback in case a browser never fires onend/onerror for this utterance.
+  setTimeout(finishOnce, 4000);
 }

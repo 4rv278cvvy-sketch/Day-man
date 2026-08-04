@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { CATEGORIES, getCharacter } from "./characters.js";
-import { playTick, playFinalFanfare, speakCountNumber, speakFinal } from "./sound.js";
+import { playTick, speakCountNumber, playFinalOnce } from "./sound.js";
 import "./App.css";
 
 const PRESETS = [
@@ -51,7 +51,7 @@ function Confetti() {
   );
 }
 
-function SetupScreen({ selectedId, onSelect, duration, onDuration, onStart }) {
+function SetupScreen({ selectedId, onSelect, duration, onDuration, finalMode, onFinalMode, onStart }) {
   const [customMinutes, setCustomMinutes] = useState(0);
   const [customSeconds, setCustomSeconds] = useState(20);
 
@@ -127,6 +127,29 @@ function SetupScreen({ selectedId, onSelect, duration, onDuration, onStart }) {
 
       <p className="duration-readout">Timer set to {formatTime(duration)}</p>
 
+      <h2 className="group-label">Final sound</h2>
+      <div className="preset-row">
+        <button
+          className={`preset-btn ${finalMode === "repeat" ? "selected" : ""}`}
+          type="button"
+          onClick={() => onFinalMode("repeat")}
+        >
+          🔁 Keep playing
+        </button>
+        <button
+          className={`preset-btn ${finalMode === "once" ? "selected" : ""}`}
+          type="button"
+          onClick={() => onFinalMode("once")}
+        >
+          🔂 Play once
+        </button>
+      </div>
+      <p className="duration-readout">
+        {finalMode === "repeat"
+          ? "Buddy's sound repeats until you stop it."
+          : "Buddy's sound plays once, then it's quiet."}
+      </p>
+
       <button className="start-btn" type="button" disabled={!selectedId} onClick={onStart}>
         ▶ Start!
       </button>
@@ -134,12 +157,28 @@ function SetupScreen({ selectedId, onSelect, duration, onDuration, onStart }) {
   );
 }
 
-function CountdownScreen({ character, duration, onExit, onRestart }) {
+function CountdownScreen({ character, duration, finalMode, onExit, onRestart }) {
   const [remaining, setRemaining] = useState(duration);
   const [running, setRunning] = useState(true);
   const [bounceKey, setBounceKey] = useState(0);
   const [finished, setFinished] = useState(false);
+  const [repeating, setRepeating] = useState(false);
   const intervalRef = useRef(null);
+  const repeatTimeoutRef = useRef(null);
+  const repeatingRef = useRef(false);
+
+  const setRepeatingBoth = (value) => {
+    repeatingRef.current = value;
+    setRepeating(value);
+  };
+
+  function runFinalCycle() {
+    playFinalOnce(character, () => {
+      if (repeatingRef.current) {
+        repeatTimeoutRef.current = setTimeout(runFinalCycle, 700);
+      }
+    });
+  }
 
   useEffect(() => {
     if (!running || finished) return undefined;
@@ -151,9 +190,9 @@ function CountdownScreen({ character, duration, onExit, onRestart }) {
         if (next <= 0) {
           clearInterval(intervalRef.current);
           setFinished(true);
-          playFinalFanfare(character);
-          speakFinal(character);
           setBounceKey((k) => k + 1);
+          setRepeatingBoth(finalMode === "repeat");
+          runFinalCycle();
           return 0;
         }
 
@@ -168,6 +207,32 @@ function CountdownScreen({ character, duration, onExit, onRestart }) {
 
     return () => clearInterval(intervalRef.current);
   }, [running, finished, character]);
+
+  // Stop any pending repeat / in-flight speech when this run ends (exit or restart).
+  useEffect(() => {
+    return () => {
+      clearTimeout(repeatTimeoutRef.current);
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    };
+  }, []);
+
+  const handleSoundToggle = () => {
+    if (finalMode === "once") {
+      runFinalCycle();
+      return;
+    }
+    const next = !repeatingRef.current;
+    setRepeatingBoth(next);
+    if (next) {
+      runFinalCycle();
+    } else {
+      clearTimeout(repeatTimeoutRef.current);
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    }
+  };
+
+  const soundToggleLabel =
+    finalMode === "once" ? "🔊 Hear it again" : repeating ? "🔇 Stop sound" : "🔁 Keep playing";
 
   const togglePause = () => setRunning((r) => !r);
 
@@ -225,6 +290,9 @@ function CountdownScreen({ character, duration, onExit, onRestart }) {
             <button className="control-btn" type="button" onClick={onExit}>
               🐾 Choose another
             </button>
+            <button className="control-btn" type="button" onClick={handleSoundToggle}>
+              {soundToggleLabel}
+            </button>
           </div>
         </>
       )}
@@ -236,6 +304,7 @@ export default function App() {
   const [phase, setPhase] = useState("setup");
   const [selectedId, setSelectedId] = useState(null);
   const [duration, setDuration] = useState(30);
+  const [finalMode, setFinalMode] = useState("repeat");
   const [runId, setRunId] = useState(0);
 
   const character = selectedId ? getCharacter(selectedId) : null;
@@ -260,6 +329,8 @@ export default function App() {
           onSelect={setSelectedId}
           duration={duration}
           onDuration={setDuration}
+          finalMode={finalMode}
+          onFinalMode={setFinalMode}
           onStart={handleStart}
         />
       )}
@@ -268,6 +339,7 @@ export default function App() {
           key={runId}
           character={character}
           duration={duration}
+          finalMode={finalMode}
           onExit={handleExit}
           onRestart={handleRestart}
         />
