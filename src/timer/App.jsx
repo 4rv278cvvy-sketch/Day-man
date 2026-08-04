@@ -209,8 +209,12 @@ function CountdownScreen({ character, duration, finalMode, onExit, onRestart }) 
   }, [running, finished, character]);
 
   // Stop any pending repeat / in-flight speech when this run ends (exit or restart).
+  // repeatingRef must flip to false here too — an in-flight cry's onDone callback
+  // (scheduled before unmount) still fires after unmount and would otherwise see
+  // a stale "true" and reschedule another cycle for a screen that's already gone.
   useEffect(() => {
     return () => {
+      repeatingRef.current = false;
       clearTimeout(repeatTimeoutRef.current);
       if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     };

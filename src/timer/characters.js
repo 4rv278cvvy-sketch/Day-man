@@ -1,6 +1,6 @@
 // Countdown "buddies": animals and vehicles the kid can pick.
 // Each one has a distinct tick sound (played every second) and a
-// bigger final sound + phrase played when the countdown hits zero.
+// synthesized cry (see sound.js) played when the countdown hits zero.
 
 export const CATEGORIES = [
   {
@@ -13,7 +13,6 @@ export const CATEGORIES = [
         color: "#f5a623",
         tick: { wave: "triangle", freq: 520, duration: 0.12 },
         finalWord: "Woof woof!",
-        finalNotes: [660, 660, 880],
       },
       {
         id: "cat",
@@ -22,7 +21,6 @@ export const CATEGORIES = [
         color: "#9b59b6",
         tick: { wave: "sine", freq: 700, duration: 0.1 },
         finalWord: "Meow!",
-        finalNotes: [784, 988, 1175],
       },
       {
         id: "lion",
@@ -31,7 +29,6 @@ export const CATEGORIES = [
         color: "#e67e22",
         tick: { wave: "sawtooth", freq: 220, duration: 0.14 },
         finalWord: "ROAR!",
-        finalNotes: [196, 220, 330, 440],
       },
       {
         id: "cow",
@@ -40,7 +37,6 @@ export const CATEGORIES = [
         color: "#2ecc71",
         tick: { wave: "triangle", freq: 300, duration: 0.14 },
         finalWord: "Moo!",
-        finalNotes: [294, 349, 392],
       },
       {
         id: "duck",
@@ -49,7 +45,6 @@ export const CATEGORIES = [
         color: "#f1c40f",
         tick: { wave: "square", freq: 600, duration: 0.08 },
         finalWord: "Quack quack!",
-        finalNotes: [523, 659, 784],
       },
       {
         id: "elephant",
@@ -58,7 +53,6 @@ export const CATEGORIES = [
         color: "#7f8c8d",
         tick: { wave: "sine", freq: 260, duration: 0.14 },
         finalWord: "Toooot!",
-        finalNotes: [174, 196, 261, 174],
       },
     ],
   },
@@ -71,8 +65,7 @@ export const CATEGORIES = [
         emoji: "🚗",
         color: "#3498db",
         tick: { wave: "square", freq: 200, duration: 0.1 },
-        finalWord: "Vroom vroom! We arrived!",
-        finalNotes: [392, 392, 523],
+        finalWord: "Honk honk!",
       },
       {
         id: "bus",
@@ -80,8 +73,7 @@ export const CATEGORIES = [
         emoji: "🚌",
         color: "#e74c3c",
         tick: { wave: "square", freq: 180, duration: 0.12 },
-        finalWord: "Beep beep! Bus stop!",
-        finalNotes: [349, 349, 523, 523],
+        finalWord: "Beep beep!",
       },
       {
         id: "train",
@@ -89,8 +81,7 @@ export const CATEGORIES = [
         emoji: "🚂",
         color: "#16a085",
         tick: { wave: "triangle", freq: 240, duration: 0.16 },
-        finalWord: "Choo choo! All aboard home!",
-        finalNotes: [261, 293, 329, 392],
+        finalWord: "Choo choo!",
       },
       {
         id: "firetruck",
@@ -98,8 +89,7 @@ export const CATEGORIES = [
         emoji: "🚒",
         color: "#c0392b",
         tick: { wave: "sawtooth", freq: 500, duration: 0.09 },
-        finalWord: "Nee naw! Fire truck is here!",
-        finalNotes: [880, 660, 880, 660],
+        finalWord: "Nee-naw nee-naw!",
       },
       {
         id: "rocket",
@@ -108,7 +98,6 @@ export const CATEGORIES = [
         color: "#8e44ad",
         tick: { wave: "sawtooth", freq: 150, duration: 0.1 },
         finalWord: "Blast off!",
-        finalNotes: [130, 165, 196, 261, 392],
       },
       {
         id: "airplane",
@@ -116,8 +105,7 @@ export const CATEGORIES = [
         emoji: "✈️",
         color: "#2980b9",
         tick: { wave: "sine", freq: 440, duration: 0.1 },
-        finalWord: "Whoosh! We landed!",
-        finalNotes: [440, 494, 587],
+        finalWord: "Whoosh!",
       },
     ],
   },
