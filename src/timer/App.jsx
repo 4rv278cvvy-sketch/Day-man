@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { CATEGORIES, getCharacter } from "./characters.js";
-import { playTick, speakCountNumber, playFinalOnce } from "./sound.js";
+import { playFootstep, speakCountNumber, playFinalOnce } from "./sound.js";
 import "./App.css";
 
 const PRESETS = [
@@ -160,7 +160,6 @@ function SetupScreen({ selectedId, onSelect, duration, onDuration, finalMode, on
 function CountdownScreen({ character, duration, finalMode, onExit, onRestart }) {
   const [remaining, setRemaining] = useState(duration);
   const [running, setRunning] = useState(true);
-  const [bounceKey, setBounceKey] = useState(0);
   const [finished, setFinished] = useState(false);
   const [repeating, setRepeating] = useState(false);
   const intervalRef = useRef(null);
@@ -190,17 +189,15 @@ function CountdownScreen({ character, duration, finalMode, onExit, onRestart }) 
         if (next <= 0) {
           clearInterval(intervalRef.current);
           setFinished(true);
-          setBounceKey((k) => k + 1);
           setRepeatingBoth(finalMode === "repeat");
           runFinalCycle();
           return 0;
         }
 
-        playTick(character);
+        playFootstep(character);
         if (next <= 3) {
           speakCountNumber(next);
         }
-        setBounceKey((k) => k + 1);
         return next;
       });
     }, 1000);
@@ -248,33 +245,26 @@ function CountdownScreen({ character, duration, finalMode, onExit, onRestart }) 
       style={{ "--accent": character.color }}
     >
       {finished && <Confetti />}
+      <div className={`flash-overlay ${finished ? "flashing" : ""}`} aria-hidden="true" />
 
       <button className="exit-btn" type="button" onClick={onExit}>
         ✕
       </button>
 
       <div className="progress-ring-wrap">
-        <svg viewBox="0 0 120 120" className="progress-ring">
-          <circle cx="60" cy="60" r="54" className="ring-bg" />
-          <circle
-            cx="60"
-            cy="60"
-            r="54"
-            className="ring-fg"
-            style={{
-              strokeDasharray: 2 * Math.PI * 54,
-              strokeDashoffset: 2 * Math.PI * 54 * (1 - progress),
-            }}
-          />
-        </svg>
-        <div key={bounceKey} className={`character-big ${finished ? "celebrate" : "bounce"}`}>
-          {character.emoji}
+        <div className="progress-pie" style={{ "--remaining-pct": `${(1 - progress) * 100}%` }} />
+        <div className="dial-content">
+          {!finished && <div className="time-readout">{formatTime(remaining)}</div>}
+          <div
+            className={`character-big ${finished ? "celebrate" : remaining % 2 === 0 ? "step-a" : "step-b"}`}
+          >
+            {character.emoji}
+          </div>
         </div>
       </div>
 
       {!finished ? (
         <>
-          <div className="time-readout">{formatTime(remaining)}</div>
           <div className="controls-row">
             <button className="control-btn" type="button" onClick={togglePause}>
               {running ? "⏸ Pause" : "▶ Resume"}

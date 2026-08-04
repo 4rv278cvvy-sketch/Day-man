@@ -31,7 +31,14 @@ function playTone(freq, duration, wave = "sine", startTime = 0, volume = 0.25) {
 
 export function playTick(character) {
   const { wave, freq, duration } = character.tick;
-  playTone(freq, duration, wave);
+  playTone(freq, duration, wave, 0, 0.3);
+}
+
+// A tick plus a soft low thump underneath, giving each second some
+// physical "footstep" weight to match the buddy's step animation.
+export function playFootstep(character) {
+  playTick(character);
+  playTone(90, 0.07, "sine", 0, 0.14);
 }
 
 let voicesReady = false;
@@ -229,11 +236,20 @@ const CRY_FUNCS = {
   },
 };
 
+// A bright ascending sparkle layered under the cry for extra "ta-da!"
+// impact — the kind of loud, celebratory hit a countdown payoff needs.
+function playSparkle(startTime) {
+  [523, 659, 784, 1047].forEach((freq, i) => {
+    playTone(freq, 0.4, "sine", startTime + i * 0.045, 0.16);
+  });
+}
+
 // Plays the buddy's synthesized sound once, then calls onDone after it
 // finishes — used both for a single "hear it again" tap and to chain
 // indefinite repeats.
 export function playFinalOnce(character, onDone) {
   const fn = CRY_FUNCS[character.id] || CRY_FUNCS.cat;
-  const duration = fn(0.4);
+  playSparkle(0);
+  const duration = fn(0.6);
   if (onDone) setTimeout(onDone, Math.max(300, duration * 1000 + 250));
 }
