@@ -67,6 +67,7 @@ body {
 
 .character-card {
   --accent: #999;
+  position: relative;
   border: 3px solid transparent;
   background: white;
   border-radius: 18px;
@@ -79,6 +80,23 @@ body {
   box-shadow: 0 4px 0 rgba(0, 0, 0, 0.08);
   transition: transform 0.15s ease, border-color 0.15s ease;
   font-family: inherit;
+}
+
+.synth-badge {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0.75;
+}
+
+.synth-legend {
+  width: 100%;
+  text-align: left;
+  font-size: 12px;
+  color: #6b5b8a;
+  margin: 6px 0 0;
 }
 
 .character-card:hover {

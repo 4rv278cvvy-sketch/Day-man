@@ -77,6 +77,11 @@ function SetupScreen({ selectedId, onSelect, duration, onDuration, finalMode, on
                 onClick={() => onSelect(c.id)}
                 type="button"
               >
+                {c.sound?.type === "synth" && (
+                  <span className="synth-badge" title="Synthesized sound, not a real recording">
+                    🎼
+                  </span>
+                )}
                 <span className="character-emoji">{c.emoji}</span>
                 <span className="character-name">{c.name}</span>
               </button>
@@ -84,6 +89,7 @@ function SetupScreen({ selectedId, onSelect, duration, onDuration, finalMode, on
           </div>
         </div>
       ))}
+      <p className="synth-legend">🎼 = synthesized sound. Buddies without the badge use a real recording.</p>
 
       <h2 className="group-label">How long?</h2>
       <div className="preset-row">

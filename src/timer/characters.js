@@ -1,6 +1,8 @@
 // Countdown "buddies": animals and vehicles the kid can pick.
-// Each one has a distinct tick sound (played every second) and a
-// synthesized cry (see sound.js) played when the countdown hits zero.
+// Each one has a distinct tick sound (played every second) and a final
+// sound played when the countdown hits zero — either a real recording
+// (sound.type "real", CC0-licensed, see sounds/CREDITS.md) or a synthesized
+// cry generated in-browser (sound.type "synth", marked with a 🎼 badge).
 
 export const CATEGORIES = [
   {
@@ -13,6 +15,7 @@ export const CATEGORIES = [
         color: "#f5a623",
         tick: { wave: "triangle", freq: 520, duration: 0.12 },
         finalWord: "Woof woof!",
+        sound: { type: "synth" },
       },
       {
         id: "cat",
@@ -21,6 +24,7 @@ export const CATEGORIES = [
         color: "#9b59b6",
         tick: { wave: "sine", freq: 700, duration: 0.1 },
         finalWord: "Meow!",
+        sound: { type: "synth" },
       },
       {
         id: "lion",
@@ -29,6 +33,7 @@ export const CATEGORIES = [
         color: "#e67e22",
         tick: { wave: "sawtooth", freq: 220, duration: 0.14 },
         finalWord: "ROAR!",
+        sound: { type: "synth" },
       },
       {
         id: "cow",
@@ -37,6 +42,7 @@ export const CATEGORIES = [
         color: "#2ecc71",
         tick: { wave: "triangle", freq: 300, duration: 0.14 },
         finalWord: "Moo!",
+        sound: { type: "real", file: "cow-moo.mp3" },
       },
       {
         id: "duck",
@@ -45,6 +51,7 @@ export const CATEGORIES = [
         color: "#f1c40f",
         tick: { wave: "square", freq: 600, duration: 0.08 },
         finalWord: "Quack quack!",
+        sound: { type: "synth" },
       },
       {
         id: "elephant",
@@ -53,6 +60,79 @@ export const CATEGORIES = [
         color: "#7f8c8d",
         tick: { wave: "sine", freq: 260, duration: 0.14 },
         finalWord: "Toooot!",
+        sound: { type: "synth" },
+      },
+      {
+        id: "chicken",
+        name: "Chicken",
+        emoji: "🐔",
+        color: "#f1c40f",
+        tick: { wave: "square", freq: 650, duration: 0.08 },
+        finalWord: "Cluck cluck!",
+        sound: { type: "real", file: "chicken-cluck.mp3" },
+      },
+      {
+        id: "horse",
+        name: "Horse",
+        emoji: "🐴",
+        color: "#a0522d",
+        tick: { wave: "triangle", freq: 200, duration: 0.12 },
+        finalWord: "Neigh!",
+        sound: { type: "real", file: "horse-trot.mp3" },
+      },
+      {
+        id: "pig",
+        name: "Pig",
+        emoji: "🐷",
+        color: "#ff8fa3",
+        tick: { wave: "square", freq: 400, duration: 0.1 },
+        finalWord: "Oink oink!",
+        sound: { type: "real", file: "pig-oink.mp3" },
+      },
+      {
+        id: "sheep",
+        name: "Sheep",
+        emoji: "🐑",
+        color: "#d6d0c4",
+        tick: { wave: "triangle", freq: 350, duration: 0.12 },
+        finalWord: "Baa!",
+        sound: { type: "real", file: "sheep-baa.mp3" },
+      },
+      {
+        id: "giraffe",
+        name: "Giraffe",
+        emoji: "🦒",
+        color: "#e6a817",
+        tick: { wave: "sine", freq: 240, duration: 0.13 },
+        finalWord: "Hmmmm!",
+        sound: { type: "synth" },
+      },
+      {
+        id: "tiger",
+        name: "Tiger",
+        emoji: "🐯",
+        color: "#e8871e",
+        tick: { wave: "sawtooth", freq: 230, duration: 0.13 },
+        finalWord: "GRRROAR!",
+        sound: { type: "synth" },
+      },
+      {
+        id: "monkey",
+        name: "Monkey",
+        emoji: "🐵",
+        color: "#8a5a35",
+        tick: { wave: "square", freq: 500, duration: 0.08 },
+        finalWord: "Ooh ooh ah ah!",
+        sound: { type: "synth" },
+      },
+      {
+        id: "penguin",
+        name: "Penguin",
+        emoji: "🐧",
+        color: "#3f6f8f",
+        tick: { wave: "square", freq: 320, duration: 0.09 },
+        finalWord: "Honk-hraaa!",
+        sound: { type: "synth" },
       },
     ],
   },
@@ -66,6 +146,7 @@ export const CATEGORIES = [
         color: "#3498db",
         tick: { wave: "square", freq: 200, duration: 0.1 },
         finalWord: "Honk honk!",
+        sound: { type: "synth" },
       },
       {
         id: "bus",
@@ -74,6 +155,7 @@ export const CATEGORIES = [
         color: "#e74c3c",
         tick: { wave: "square", freq: 180, duration: 0.12 },
         finalWord: "Beep beep!",
+        sound: { type: "synth" },
       },
       {
         id: "train",
@@ -82,6 +164,7 @@ export const CATEGORIES = [
         color: "#16a085",
         tick: { wave: "triangle", freq: 240, duration: 0.16 },
         finalWord: "Choo choo!",
+        sound: { type: "synth" },
       },
       {
         id: "firetruck",
@@ -90,6 +173,7 @@ export const CATEGORIES = [
         color: "#c0392b",
         tick: { wave: "sawtooth", freq: 500, duration: 0.09 },
         finalWord: "Nee-naw nee-naw!",
+        sound: { type: "synth" },
       },
       {
         id: "rocket",
@@ -98,6 +182,7 @@ export const CATEGORIES = [
         color: "#8e44ad",
         tick: { wave: "sawtooth", freq: 150, duration: 0.1 },
         finalWord: "Blast off!",
+        sound: { type: "synth" },
       },
       {
         id: "airplane",
@@ -106,6 +191,7 @@ export const CATEGORIES = [
         color: "#2980b9",
         tick: { wave: "sine", freq: 440, duration: 0.1 },
         finalWord: "Whoosh!",
+        sound: { type: "synth" },
       },
     ],
   },

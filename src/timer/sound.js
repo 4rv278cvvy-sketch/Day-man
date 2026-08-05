@@ -1,6 +1,21 @@
-// Small self-contained sound engine built on the Web Audio API, so the
-// app needs no external audio files. AudioContext is created lazily on
-// the first user gesture (Start button) to satisfy autoplay policies.
+// Sound engine: most cries are synthesized in-browser via the Web Audio
+// API, but a handful are real CC0-licensed recordings (see sounds/CREDITS.md)
+// bundled as assets and played back through <audio>. AudioContext is
+// created lazily on the first user gesture (Start button).
+
+import chickenClusterUrl from "./sounds/chicken-cluck.mp3?url";
+import cowMooUrl from "./sounds/cow-moo.mp3?url";
+import horseTrotUrl from "./sounds/horse-trot.mp3?url";
+import pigOinkUrl from "./sounds/pig-oink.mp3?url";
+import sheepBaaUrl from "./sounds/sheep-baa.mp3?url";
+
+const REAL_FILES = {
+  "chicken-cluck.mp3": chickenClusterUrl,
+  "cow-moo.mp3": cowMooUrl,
+  "horse-trot.mp3": horseTrotUrl,
+  "pig-oink.mp3": pigOinkUrl,
+  "sheep-baa.mp3": sheepBaaUrl,
+};
 
 let ctx = null;
 
@@ -234,6 +249,32 @@ const CRY_FUNCS = {
   airplane(vol) {
     return noiseBurst({ duration: 0.9, filterType: "bandpass", filterFreq: 1500, filterQ: 0.5, volume: vol * 0.5, attack: 0.05, release: 0.5 });
   },
+  giraffe(vol) {
+    noiseBurst({ duration: 0.6, filterType: "lowpass", filterFreq: 300, filterQ: 0.6, volume: vol * 0.2, attack: 0.15 });
+    return sweepTone({ duration: 1.0, wave: "sine", freqPoints: [[0, 85], [0.35, 105], [1, 78]], volume: vol * 0.85, vibratoHz: 4, vibratoCents: 5, attack: 0.18, release: 0.4 });
+  },
+  tiger(vol) {
+    noiseBurst({ duration: 0.08, filterType: "bandpass", filterFreq: 900, filterQ: 0.8, volume: vol * 0.5, attack: 0.005 });
+    noiseBurst({ startTime: 0.1, duration: 1.0, filterType: "lowpass", filterFreq: 500, filterQ: 0.7, volume: vol * 0.35, attack: 0.2 });
+    return sweepTone({ startTime: 0.1, duration: 1.0, wave: "sawtooth", freqPoints: [[0, 120], [0.2, 170], [0.55, 130], [1, 75]], volume: vol, vibratoHz: 8, vibratoCents: 14, attack: 0.1, release: 0.35, filterType: "lowpass", filterFreq: 1200, filterQ: 1 }) + 0.1;
+  },
+  monkey(vol) {
+    const calls = [900, 520, 850, 500, 780];
+    let t = 0;
+    calls.forEach((freq, i) => {
+      sweepTone({ startTime: t, duration: 0.09, wave: i % 2 === 0 ? "sawtooth" : "square", freqPoints: [[0, freq], [1, freq * 0.7]], volume: vol * 0.7, attack: 0.008, release: 0.04 });
+      t += 0.11;
+    });
+    return t;
+  },
+  penguin(vol) {
+    function brayOnce(startTime) {
+      return sweepTone({ startTime, duration: 0.25, wave: "square", freqPoints: [[0, 300], [0.5, 420], [1, 280]], volume: vol, filterType: "bandpass", filterFreq: 800, filterQ: 1.5, attack: 0.01, release: 0.08 });
+    }
+    const d1 = brayOnce(0);
+    brayOnce(d1 + 0.08);
+    return d1 + 0.08 + d1;
+  },
 };
 
 // A bright ascending sparkle layered under the cry for extra "ta-da!"
@@ -244,12 +285,37 @@ function playSparkle(startTime) {
   });
 }
 
-// Plays the buddy's synthesized sound once, then calls onDone after it
-// finishes — used both for a single "hear it again" tap and to chain
-// indefinite repeats.
+// Plays the buddy's real recording once, then calls onDone when playback
+// ends (with a safety-timeout fallback in case 'ended' never fires).
+function playRealSound(file, onDone) {
+  const src = REAL_FILES[file];
+  if (!src) {
+    if (onDone) setTimeout(onDone, 800);
+    return;
+  }
+  const audioEl = new Audio(src);
+  let done = false;
+  const finishOnce = () => {
+    if (done) return;
+    done = true;
+    if (onDone) onDone();
+  };
+  audioEl.addEventListener("ended", finishOnce);
+  audioEl.addEventListener("error", finishOnce);
+  audioEl.play().catch(finishOnce);
+  setTimeout(finishOnce, 4000);
+}
+
+// Plays the buddy's final sound once — a real recording or a synthesized
+// cry, depending on the character — then calls onDone after it finishes.
+// Used both for a single "hear it again" tap and to chain indefinite repeats.
 export function playFinalOnce(character, onDone) {
-  const fn = CRY_FUNCS[character.id] || CRY_FUNCS.cat;
   playSparkle(0);
+  if (character.sound?.type === "real") {
+    playRealSound(character.sound.file, onDone);
+    return;
+  }
+  const fn = CRY_FUNCS[character.id] || CRY_FUNCS.cat;
   const duration = fn(0.6);
   if (onDone) setTimeout(onDone, Math.max(300, duration * 1000 + 250));
 }
