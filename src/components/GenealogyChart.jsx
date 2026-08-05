@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as f3 from "family-chart";
 import "family-chart/styles/family-chart.css";
-import { toPng, toJpeg } from "html-to-image";
+import { toBlob, toJpeg } from "html-to-image";
 import { jsPDF } from "jspdf";
 
 // Arbre interactif (ascendants + conjoint(e)s + descendants autour d'une
@@ -14,6 +14,17 @@ import { jsPDF } from "jspdf";
 // sable réseau fait échouer l'inlining de tout le CSS chez html-to-image),
 // et retomberait alors sur le stroke="#fff" par défaut de la librairie,
 // invisible sur le fond crème.
+// Conversion locale (aucune requete reseau, donc compatible avec la CSP stricte
+// des artefacts) d'un Blob vers une data: URI, pour l'affichage de repli.
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
 function paintLinks(cont) {
   cont.querySelectorAll("path.link").forEach((path) => {
     path.setAttribute("stroke", "#8C6D3F");
@@ -152,9 +163,16 @@ export default function GenealogyChart({ data, mainId, onSelect }) {
   //     échoue avec « Cannot save image — No Internet connection » (testé) :
   //     le mécanisme d'enregistrement d'iOS semble vouloir re-télécharger la
   //     ressource plutôt que lire les octets déjà en mémoire pour une blob: URL.
-  // Solution retenue : la même chose que 4, mais avec une data: URI comme src
-  // au lieu d'une blob: URL — l'image est encodée directement dans la chaîne
-  // de l'URL, donc il n'y a rien à re-télécharger pour l'enregistrer.
+  //  5. Idem mais avec une data: URI comme src (l'image encodée dans la chaîne
+  //     elle-même, donc rien a re-telecharger) — conservé comme solution de repli.
+  // Solution retenue : window.claude.downloads.save(), l'API d'enregistrement
+  // officielle de la visionneuse d'artefacts, quand elle est disponible : c'est
+  // un vrai enregistrement de fichier pris en charge par la plateforme, au lieu
+  // des contournements ci-dessus qui dependent tous du comportement du
+  // navigateur. Uniquement pour le PNG : la liste des extensions autorisees
+  // (gif png jpg jpeg webp mp4 webm txt json md, + docx pptx epub csv ttf html
+  // svg si active) ne contient PAS pdf, qui serait donc rejete. Le PDF garde
+  // donc l'affichage plein ecran (5), et le PNG y retombe aussi hors artefact.
   async function exportTree(format) {
     const chart = chartRef.current;
     const cont = containerRef.current;
@@ -173,17 +191,13 @@ export default function GenealogyChart({ data, mainId, onSelect }) {
       chart.updateTree({ tree_position: "fit", transition_time: 0 });
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-      let url;
+      // Nom de fichier en ASCII : il est assaini par la visionneuse avant
+      // confirmation, et de l'arabe risquerait d'en ressortir transforme.
+      let blob;
       let filename;
       if (format === "png") {
-        // data: URI (pas blob:) : le geste natif iOS « appui long → Enregistrer
-        // l'image » a échoué avec « Cannot save image — No Internet connection »
-        // sur une blob: URL — testé sur le téléphone de l'utilisateur. iOS semble
-        // vouloir re-télécharger la ressource plutôt que lire les octets déjà en
-        // mémoire pour une blob: URL. Une data: URI contient l'image telle
-        // quelle dans la chaîne elle-même, donc rien à aller chercher.
-        url = await toPng(cont, { width, height, backgroundColor: "#FBF6E9", pixelRatio: 2 });
-        filename = "شجرة-نسب-سيد-الفالي.png";
+        blob = await toBlob(cont, { width, height, backgroundColor: "#FBF6E9", pixelRatio: 2 });
+        filename = "sidi-el-vali-genealogie.png";
       } else {
         // JPEG (pas PNG) dans le PDF : un PNG plein cadre à pixelRatio 2 produit
         // un PDF de 20-25 Mo pour un simple diagramme à aplats de couleur — le
@@ -191,13 +205,26 @@ export default function GenealogyChart({ data, mainId, onSelect }) {
         const dataUrl = await toJpeg(cont, { width, height, backgroundColor: "#FBF6E9", pixelRatio: 2, quality: 0.92 });
         const pdf = new jsPDF({ orientation: width >= height ? "landscape" : "portrait", unit: "px", format: [width, height] });
         pdf.addImage(dataUrl, "JPEG", 0, 0, width, height);
-        // Le PDF est affiché dans un <iframe> (pas via le geste "enregistrer
-        // l'image" d'iOS), donc pas concerné par le même problème ; datauristring
-        // reste plus simple qu'un blob: à révoquer.
-        url = pdf.output("datauristring");
-        filename = "شجرة-نسب-سيد-الفالي.pdf";
+        blob = pdf.output("blob");
+        filename = "sidi-el-vali-genealogie.pdf";
       }
 
+      // Enregistrement natif de la visionneuse d'artefacts (PNG uniquement,
+      // cf. la liste d'extensions autorisees expliquee plus haut).
+      if (format === "png" && typeof window.claude?.downloads?.save === "function") {
+        try {
+          await window.claude.downloads.save({ filename, data: blob });
+          return; // le bloc finally s'execute quand meme (restauration de l'arbre)
+        } catch (err) {
+          // L'utilisateur a refuse l'enregistrement : ne rien faire de plus,
+          // surtout pas re-proposer automatiquement.
+          if (err && err.code === "declined") return;
+          // Tout autre code (indisponible, trop gros, bug d'appel...) : on
+          // retombe sur l'affichage plein ecran ci-dessous.
+        }
+      }
+
+      const url = await blobToDataUrl(blob);
       setExportResult({ url, filename, format });
     } finally {
       cont.style.width = prevStyle.width;
