@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { CATEGORIES, getCharacter } from "./characters.js";
-import { playFootstep, speakCountNumber, playFinalOnce } from "./sound.js";
+import { playFootstep, speakCountNumber, playFinalOnce, preloadRealSound } from "./sound.js";
 import "./App.css";
 
 const PRESETS = [
@@ -176,6 +176,11 @@ function CountdownScreen({ character, duration, finalMode, onExit, onRestart }) 
     repeatingRef.current = value;
     setRepeating(value);
   };
+
+  // Decode a real sound well ahead of the finish moment instead of at it.
+  useEffect(() => {
+    preloadRealSound(character);
+  }, [character]);
 
   function runFinalCycle() {
     playFinalOnce(character, () => {

@@ -1,7 +1,11 @@
 // Sound engine: most cries are synthesized in-browser via the Web Audio
 // API, but a handful are real CC0-licensed recordings (see sounds/CREDITS.md)
-// bundled as assets and played back through <audio>. AudioContext is
-// created lazily on the first user gesture (Start button).
+// bundled as assets and decoded into AudioBuffers, then played through the
+// same AudioContext as everything else (not a separate <audio> element —
+// iOS Safari silently blocks HTMLAudioElement playback triggered from a
+// timer callback with no direct tap in the call stack, even though it
+// never throws). AudioContext is created lazily on the first user gesture
+// (Start button).
 
 import chickenClusterUrl from "./sounds/chicken-cluck.mp3?url";
 import cowMooUrl from "./sounds/cow-moo.mp3?url";
@@ -285,25 +289,53 @@ function playSparkle(startTime) {
   });
 }
 
-// Plays the buddy's real recording once, then calls onDone when playback
-// ends (with a safety-timeout fallback in case 'ended' never fires).
-function playRealSound(file, onDone) {
+const realBufferCache = {};
+
+function getRealBuffer(file) {
+  if (realBufferCache[file]) return realBufferCache[file];
   const src = REAL_FILES[file];
-  if (!src) {
-    if (onDone) setTimeout(onDone, 800);
-    return;
+  if (!src) return Promise.resolve(null);
+  const promise = fetch(src)
+    .then((r) => r.arrayBuffer())
+    .then((arrayBuffer) => getContext().decodeAudioData(arrayBuffer))
+    .catch(() => null);
+  realBufferCache[file] = promise;
+  return promise;
+}
+
+// Pre-fetches and decodes a real sound so it's ready the instant the
+// countdown finishes, instead of decoding for the first time at that moment.
+export function preloadRealSound(character) {
+  if (character.sound?.type === "real") {
+    getRealBuffer(character.sound.file);
   }
-  const audioEl = new Audio(src);
-  let done = false;
-  const finishOnce = () => {
-    if (done) return;
-    done = true;
-    if (onDone) onDone();
-  };
-  audioEl.addEventListener("ended", finishOnce);
-  audioEl.addEventListener("error", finishOnce);
-  audioEl.play().catch(finishOnce);
-  setTimeout(finishOnce, 4000);
+}
+
+// Plays the buddy's real recording once, then calls onDone when playback
+// ends (with a safety-timeout fallback in case 'onended' never fires).
+function playRealSound(file, onDone) {
+  getRealBuffer(file).then((buffer) => {
+    if (!buffer) {
+      if (onDone) setTimeout(onDone, 800);
+      return;
+    }
+    const audio = getContext();
+    const src = audio.createBufferSource();
+    src.buffer = buffer;
+    const gain = audio.createGain();
+    gain.gain.value = 0.9;
+    src.connect(gain).connect(audio.destination);
+
+    let done = false;
+    const finishOnce = () => {
+      if (done) return;
+      done = true;
+      if (onDone) onDone();
+    };
+    src.onended = finishOnce;
+    src.start();
+    setTimeout(finishOnce, buffer.duration * 1000 + 500);
+  });
 }
 
 // Plays the buddy's final sound once — a real recording or a synthesized
